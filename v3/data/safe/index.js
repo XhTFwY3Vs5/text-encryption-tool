@@ -10,25 +10,79 @@ document.getElementById('decrypt').addEventListener('click', () => {
   document.forms[0].dataset.action = 'decrypt';
 });
 
+const download = (blob, filename) => new Promise(resolve => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+
+  a.click(); // triggers download
+
+  // Give the browser a moment to handle it
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+    resolve(); // resolved after download started
+  }, 500);
+});
+
+const clean = filename => {
+  const dotIndex = filename.lastIndexOf('.');
+  const name = dotIndex !== -1 ? filename.slice(0, dotIndex) : filename;
+  const ext = dotIndex !== -1 ? filename.slice(dotIndex) : '';
+
+  // Remove all trailing " (number)" blocks
+  const cleanedName = name.replace(/(?:\s\(\d+\))+$/, '');
+
+  return cleanedName + ext;
+};
+
 document.addEventListener('submit', async e => {
   e.preventDefault();
-  const data = document.getElementById('data').value;
   const passphrase = document.getElementById('passphrase').value;
   const result = document.getElementById('result');
-
   const safe = new Safe();
 
   if (safe[e.target.dataset.action]) {
     try {
       await safe.open(passphrase);
-      if (e.target.dataset.action === 'encrypt') {
-        result.value = 'data:application/octet-binary;base64,' + await safe.encrypt(data);
+
+      if (document.body.getAttribute('mode') === 'text') {
+        const data = document.getElementById('data').value;
+
+        if (e.target.dataset.action === 'encrypt') {
+          result.value = 'data:application/octet-binary;base64,' + await safe.encrypt(data);
+        }
+        else {
+          result.value = await safe.decrypt(data);
+        }
       }
       else {
-        result.value = await safe.decrypt(data);
+        const file = document.getElementById('file');
+        if (file.files.length === 0) {
+          throw Error('NO_INPUT_FILE');
+        }
+        for (const f of file.files) {
+          result.value = 'Working on "' + f.name + '"...';
+
+          const r = new Response(f);
+          const data = new Uint8Array(await r.arrayBuffer());
+          const converted = await safe[e.target.dataset.action](data);
+
+          const name = e.target.dataset.action === 'encrypt' ?
+            clean(f.name) + '-encrypted.bin' :
+            clean(f.name).replace('-encrypted.bin', '');
+
+          await download(converted, name);
+        }
+
+        result.value = '';
       }
     }
     catch (e) {
+      console.error(e);
       result.value = e.message || 'Operation was unsuccessful';
     }
   }
@@ -134,3 +188,59 @@ document.getElementById('swap').onclick = () => {
 document.getElementById('data').oninput = () => {
   document.getElementById('result').value = '';
 };
+
+
+document.getElementById('mode').onchange = e => {
+  document.body.setAttribute('mode', e.target.value);
+  if (e.target.value === 'text') {
+    document.getElementById('data').setAttribute('required', 'required');
+    document.getElementById('swap').disabled = false;
+    document.getElementById('records').disabled = false;
+    document.getElementById('store').disabled = false;
+  }
+  else {
+    document.getElementById('data').removeAttribute('required');
+    document.getElementById('swap').disabled = true;
+    document.getElementById('records').disabled = true;
+    document.getElementById('store').disabled = true;
+  }
+
+  if (e.isTrusted) {
+    chrome.storage.local.set({
+      mode: e.target.value
+    });
+  }
+};
+
+chrome.storage.local.get({
+  mode: 'text'
+}).then(prefs => {
+  document.getElementById(prefs.mode + '-mode').checked = true;
+  document.getElementById(prefs.mode + '-mode').dispatchEvent(new Event('change', {
+    bubbles: true
+  }));
+});
+
+{
+  const dropZone = document.getElementById('file-container');
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault(); // Required to make drop work
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    const dt = new DataTransfer();
+    for (const item of e.dataTransfer.items) {
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry?.();
+        if (entry && entry.isDirectory) {
+          continue; // skip directories
+        }
+        const file = item.getAsFile();
+        if (file) {
+          dt.items.add(file);
+        }
+      }
+    }
+    document.getElementById('file').files = dt.files;
+  });
+}

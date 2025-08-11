@@ -1,5 +1,5 @@
 {
   "description": {
-    "message": "Encrypt, decrypt, store, and sync textual data using SHA-256 Hash algorithm"
+    "message": "Encrypt and decrypt text and files with SHA-256 algorithm; store and sync encrypted textual data."
   }
 }

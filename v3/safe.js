@@ -25,8 +25,9 @@ class Safe {
       return btoa(String.fromCharCode(...new Uint8Array(ab)));
     });
   }
-  import(string) {/* Uint8Array */
-    const decodedKeyData = new Uint8Array(Array.from(atob(string), c => c.charCodeAt(0)));
+  import(data) {/* Uint8Array */
+    const decodedKeyData = typeof data === 'string' ?
+      new Uint8Array(Array.from(atob(data), c => c.charCodeAt(0))) : data;
 
     return crypto.subtle.importKey('raw', decodedKeyData, {
       name: 'AES-CBC'
@@ -34,32 +35,52 @@ class Safe {
       this.#key = key;
     });
   }
-  async encrypt(string) {
+  async encrypt(data) {
     const iv = crypto.getRandomValues(new Uint8Array(16));
 
-    const result = await crypto.subtle.encrypt({
-      name: 'AES-CBC',
-      iv
-    }, this.#key, this.#encoder.encode(string));
+    if (typeof data === 'string') {
+      const result = await crypto.subtle.encrypt({
+        name: 'AES-CBC',
+        iv
+      }, this.#key, this.#encoder.encode(data));
 
-    return new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.readAsDataURL(new Blob([iv, result], {type: 'text/enc'}));
-    });
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(new Blob([iv, result], {type: 'text/enc'}));
+      });
+    }
+    else {
+      const result = await crypto.subtle.encrypt({
+        name: 'AES-CBC',
+        iv
+      }, this.#key, data);
+
+      return new Blob([iv, result]);
+    }
   }
-  async decrypt(string) {
-    // compatibility fix
-    string = string.replace('data:application/octet-binary;base64,', '');
-
+  async decrypt(data) {
     const iv = crypto.getRandomValues(new Uint8Array(16));
 
-    const result = await crypto.subtle.decrypt({
-      name: 'AES-CBC',
-      iv
-    }, this.#key, this.#buffer(atob(string)));
+    if (typeof data === 'string') {
+      // compatibility fix
+      data = data.replace('data:application/octet-binary;base64,', '');
 
-    const ab = (new Uint8Array(result)).subarray(16);
-    return this.#decoder.decode(ab);
+      const result = await crypto.subtle.decrypt({
+        name: 'AES-CBC',
+        iv
+      }, this.#key, this.#buffer(atob(data)));
+
+      const ab = (new Uint8Array(result)).subarray(16);
+      return this.#decoder.decode(ab);
+    }
+    else {
+      const result = await crypto.subtle.decrypt({
+        name: 'AES-CBC',
+        iv
+      }, this.#key, data);
+
+      return new Blob([(new Uint8Array(result)).subarray(16)]);
+    }
   }
 }

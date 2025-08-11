@@ -6,15 +6,23 @@
   <link rel="stylesheet" type="text/css" href="index.css">
   <title>Encryption Tool</title>
   </head>
-  <body>
+  <body mode="text">
+    <div id="mode">
+      <span>Encrypt or Decrypt</span>
+      <input type="radio" name="mode" id="file-mode" value="file" accesskey="f">
+      <label for="file-mode"><u>F</u>iles</label>
+      <input type="radio" name="mode" id="text-mode" value="text" checked accesskey="t">
+      <label for="text-mode"><u>T</u>ext</label>
+    </div>
     <form action="#" autocomplete="off">
       <div>
-        <td>Passphrase</td>
-        <td><input type="password" id="passphrase" required placeholder="required*" autocomplete="off"></td>
-        <td>Input</td>
-        <td><textarea rows="4" id="data" required placeholder="required*" autofocus autocomplete="off"></textarea></td>
-        <td>Result</td>
-        <td><textarea id="result" readonly="true" placeholder="*** Readonly ***" autocomplete="off"></textarea></td>
+        <label for="passphrase">Passphrase</label>
+        <input type="password" id="passphrase" required placeholder="required*" autocomplete="off">
+        <label for="data">Input</label>
+        <textarea rows="4" id="data" placeholder="required*" autocomplete="off"></textarea>
+        <label for="file" class="button" id="file-container">Drop files here or click to browse<input type="file" id="file" multiple></label>
+        <label for="result">Result</label>
+        <textarea id="result" readonly="true" placeholder="*** Readonly ***" autocomplete="off"></textarea>
       </div>
 
       <div class="submit">
